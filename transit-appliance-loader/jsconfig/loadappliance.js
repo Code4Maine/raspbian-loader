@@ -2,7 +2,7 @@
    loadappliance.js: the workhorse of the loader
    $Id$
 
-   Copyright 2010-2011 Portland Transport
+   Copyright 2010-2012 Portland Transport
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@
 
    Authors:
    Matt Conway: main code
+   Chris Smith: Raspberry Pi version
 
 */
 
 // The number of datastores available
-DATASTORES = 4;
+DATASTORES = 5;
 VALIDATORS = 5;
 
 // The amount of time to wait for a server to respond (seconds)
@@ -32,7 +33,8 @@ TIMEOUT = 20;
 ERR_HANDLER = "http://transitappliance.com/error_service";
 
 function confirmNetwork(hwid, callback) {
-	testURLs(hwid, function() {
+	//show 'not connected' until we get a successful return from one of our repositories
+	testURLs("FF:FF:FF:FF:FF:FF", function() {
 		jQuery("img#connection_icon").attr("src","connected_512x512.png"); 
 		setTimeout(function () {
 	  		jQuery("div#connection_status").remove();
@@ -46,6 +48,10 @@ function datastore_count(n) {
 	return (n % DATASTORES) + 1;
 }
 
+function validator_count(n) {
+	return (n % VALIDATORS) + 1;
+}
+
 // Returns the URL for datastore n, hwid hwid
 function datastore(n, hwid) { 
     return 'http://repository' + datastore_count(n) + '.transitappliance.com/configuration/MAC:' + hwid;
@@ -54,7 +60,7 @@ function datastore(n, hwid) {
 function validator(n, dirtyurl) {
     // Twice b/c it gets decoded once in mod_rewrite, once in script
     var encurl = encodeURIComponent(encodeURIComponent(dirtyurl));
-    return 'http://validation' + n + '.ta-web-services.com/application_url/' + encurl;
+    return 'http://validation' + validator_count(n) + '.ta-web-services.com/application_url/' + encurl;
 }
 
 // Log to the log
@@ -172,109 +178,111 @@ function getURLs(hwid, successCallback, i) {
     if (i == undefined) var i = 0;
 
     // Check we haven't reached max datastores
-    /*
-    if (i > DATASTORES) {
-	showError('noconfig', {'hwid':hwid});
-	return;
+
+    if (i > DATASTORES*10) {
+			showError('noconfig', {'hwid':hwid});
+			return;
     }
-    */
 
-    // Try to find a URL
-    $.ajax({
-	method: 'GET',
-	// can't use data: b/c it is for query string params, and this is path
-	// type param (i.e. no ?hwid=)
-	url: datastore(i, hwid),
-	dataType: 'json',
-	timeout: TIMEOUT*1000,
-	success: function (data) {
-	    // If any of these are true, the data is no good,
-	    // so we call this function again for the next datastore
-	    if (data == null) {
-		wtolog('no data returned by Datasource ' + datastore_count(i));
-		// Call it again, Sam.
-		getURLs(hwid, successCallback, i + 1);
-		return;
-	    }	
-	    if ('error' in data) {
-		wtolog('Datasource ' + datastore_count(i) + ' error in the data returned: ' + data.error);
-		// Call it again, Sam.
-		getURLs(hwid, successCallback, i + 1);
-		return;
-	    }
-	    if (!('urls' in data)) {
-		wtolog('Datasource ' + datastore_count(i) + ' responds but has no URLs to suggest');
-		getURLs(hwid, successCallback, i + 1);
-		return;
-	    }
-	    if (data.url == 'undefined') {
-		wtolog('Datasource ' + datastore_count(i) + " responds with URL 'undefined'");
-		getURLs(hwid, successCallback, i + 1);
-		return;
-	    }
-
-	    // Run the callback
-	    var html = '<table>';
-	    var len = data.urls.length;
-	    for (var c = 0; c < len; c++) {
-		html += '<tr><td>' + data.urls[c].app_url + '</td>';
-		html += '<td>' + data.urls[c].img_url + '</td></tr>';
-	    }
-	    html += '</table>';
-	    wtolog('Datasource ' + datastore_count(i) + ' suggests URLs: ' + html);
-	    successCallback(data.urls);
-	},
-	error: function (r, status) {
-	    // As before, if the response was no good, try next
-	    wtolog('Datasource ' + datastore_count(i) + ' errors with status ' + status);
-
-	    // try the next one
-	    getURLs(hwid, successCallback, i + 1);
-	}
-    });
+		setTimeout(function(){
+	    // Wait one second then try to find a URL
+	    $.ajax({
+				method: 'GET',
+				// can't use data: b/c it is for query string params, and this is path
+				// type param (i.e. no ?hwid=)
+				url: datastore(i, hwid),
+				cache: false,
+				dataType: 'json',
+				timeout: TIMEOUT*1000,
+				success: function (data) {
+				    // If any of these are true, the data is no good,
+				    // so we call this function again for the next datastore
+				    if (data == null) {
+					wtolog('no data returned by Datasource ' + datastore_count(i));
+					// Call it again, Sam.
+					getURLs(hwid, successCallback, i + 1);
+					return;
+				    }	
+				    if ('error' in data) {
+					wtolog('Datasource ' + datastore_count(i) + ' error in the data returned: ' + data.error);
+					// Call it again, Sam.
+					getURLs(hwid, successCallback, i + 1);
+					return;
+				    }
+				    if (!('urls' in data)) {
+					wtolog('Datasource ' + datastore_count(i) + ' responds but has no URLs to suggest');
+					getURLs(hwid, successCallback, i + 1);
+					return;
+				    }
+				    if (data.url == 'undefined') {
+					wtolog('Datasource ' + datastore_count(i) + " responds with URL 'undefined'");
+					getURLs(hwid, successCallback, i + 1);
+					return;
+				    }
+			
+				    // Run the callback
+				    var html = '<table>';
+				    var len = data.urls.length;
+				    for (var c = 0; c < len; c++) {
+						html += '<tr><td>' + data.urls[c].app_url + '</td>';
+						html += '<td>' + data.urls[c].img_url + '</td></tr>';
+				    }
+				    html += '</table>';
+				    wtolog('Datasource ' + datastore_count(i) + ' suggests URLs: ' + html);
+				    successCallback(data.urls);
+				},
+				error: function (r, status) {
+				    // As before, if the response was no good, try next
+				    wtolog('Datasource ' + datastore_count(i) + ' errors with status ' + status);
+			
+				    // try the next one
+				    getURLs(hwid, successCallback, i + 1);
+				}
+	    });
+	  }, 1000);
 }
 
 // callback gets url that is clean and up
 function chooseURL (urls, callback, index) {
     if (index == undefined) {
-	index = 0;
+			index = 0;
     }
 
     // >= b/c index is from 0, length from 1
-    if (index >= urls.length) {
-	showError('nourls', {});
-	return null;
+    if (index >= urls.length*10) {
+			showError('nourls', {});
+			return null;
     }
 
-    var url = urls[index];
+    var url = urls[index % urls.length];
     wtolog('Testing URL ' + url.app_url);
 
     // Validate, then ping, then callback
     validateURL(
-	url, 
-	function(cleanUrl, status) {
-	    if (status == 'valid') {
-		// Now check that it's up
-		pingURL(
-		    cleanUrl,
-		    function (availUrl, status) {
-			if (status == 'up') {
-			    // URL is clean and up
-			    callback(availUrl);
+			url, 
+			function(cleanUrl, status) {
+			    if (status == 'valid') {
+						// Now check that it's up
+						pingURL(
+						    cleanUrl,
+						    function (availUrl, status) {
+									if (status == 'up') {
+									    // URL is clean and up
+									    callback(availUrl);
+									}
+									else {
+									    // not up
+									    // These vars should be passed down into
+									    // the closure
+									    chooseURL(urls, callback, index + 1)
+									}
+						    }
+						); // pingURL
+			    }
+			    else {
+						chooseURL(urls, callback, index + 1)
+			    }
 			}
-			else {
-			    // not up
-			    // These vars should be passed down into
-			    // the closure
-			    chooseURL(urls, callback, index + 1)
-			}
-		    }
-		); // pingURL
-	    }
-	    else {
-		chooseURL(urls, callback, index + 1)
-	    }
-	}
     ); // validateURL
 }   
 
@@ -284,41 +292,43 @@ function chooseURL (urls, callback, index) {
 function validateURL(dirtyurl, callback, i) {
     if (i == undefined) var i = 1;
 
-    if (i > VALIDATORS) {
-	wtolog('No validators responded correctly!');
-	showError('validdown');
-	return;
+    if (i > VALIDATORS*10) {
+			wtolog('No validators responded correctly!');
+			showError('validdown');
+			return;
     }
 
     wtolog('Validating URL ' + dirtyurl.app_url);
 
-    $.ajax({
-	method: 'GET',
-	url: validator(i, dirtyurl.app_url),
-	dataType: 'json',
-	timeout: TIMEOUT*1000,
-	success: function (data) {
-	    // If any of these are true, the data is no good,
-	    // so we call this function again for the next datastore
-	    if (data == null) {
-		wtolog('no data returned by validator ' + i);
-		// Call it again, Sam.
-		validateURL(dirtyurl.app_url, callback, i + 1);
-		return;
-	    }	
-	    if ('error' in data) {
-		wtolog('validator ' + i + ' error in the data returned: ' + data.error);
-		validateURL(dirtyurl.app_url, callback, i + 1);
-		return;
-	    }
-	    wtolog('URL ' + dirtyurl.app_url + ' is ' + data.status + '.');
-	    callback(dirtyurl, data.status);
-	},
-	error: function (r, message) {
-	    wtolog('Validator ' + i + ' failed with error ' + message);
-	    validateURL(dirtyurl, callback, i + 1);
-	}
-    });
+		setTimeout(function(){
+	    $.ajax({
+				method: 'GET',
+				url: validator(i, dirtyurl.app_url),
+				dataType: 'json',
+				timeout: TIMEOUT*1000,
+				success: function (data) {
+				    // If any of these are true, the data is no good,
+				    // so we call this function again for the next datastore
+				    if (data == null) {
+					wtolog( 'no data returned by validator ' + validator_count(i) );
+					// Call it again, Sam.
+					validateURL(dirtyurl.app_url, callback, i + 1);
+					return;
+				    }	
+				    if ('error' in data) {
+					wtolog('validator ' + validator_count(i) + ' error in the data returned: ' + data.error);
+					validateURL(dirtyurl.app_url, callback, i + 1);
+					return;
+				    }
+				    wtolog('URL ' + dirtyurl.app_url + ' is ' + data.status + '.');
+				    callback(dirtyurl, data.status);
+				},
+				error: function (r, message) {
+				    wtolog('Validator ' + validator_count(i) + ' failed with error ' + message);
+				    validateURL(dirtyurl, callback, i + 1);
+				}
+	    });
+	   }, 1000);
 }
 
 // callback gets URL, status ('up' or 'down') in that order
@@ -348,7 +358,7 @@ function pingURL(url, callback) {
 $('<div />') 	    
 
 // moved out so we can stub it
-function redirectTo(theurl) { window.location = theurl.app_url; }
+function redirectTo(theurl) { window.location = theurl.app_url+"&option[loader]="+encodeURI(window.location.href); }
 
 // Pad the log, so it appears below fixed elements
 function setLogOffset() {
