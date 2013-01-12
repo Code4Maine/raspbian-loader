@@ -6,6 +6,6 @@ mac=`/usr/bin/perl /etc/transit-appliance-loader/mac.pl`
 
 while true; do
  sed -i 's/"exited_cleanly": false/"exited_cleanly": true/'  /home/pi/.config/chromium/Default/Preferences 
- chromium --no-message-box --disable-restore-session-state --disable-breakpad --disable-desktop-notifications --kiosk --incognito file:///etc/transit-appliance-loader/jsconfig/loadappliance.html
+ chromium --no-message-box --disable-restore-session-state --disable-breakpad --disable-desktop-notifications --kiosk --incognito file:///etc/raspian-loader/transit-appliance-loader/jsconfig/loadappliance.html
 done
 
