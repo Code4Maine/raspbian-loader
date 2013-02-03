@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mac=`/usr/bin/perl /etc/transit-appliance-loader/mac.pl`
+mac=`/usr/bin/perl /etc/raspbian-loader/transit-appliance-loader/mac.pl`
 
 #echo "the value is $mac"
 
