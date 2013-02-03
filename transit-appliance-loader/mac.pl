@@ -3,7 +3,7 @@ my ($field1, $field2, $field3, $field4, $mac) = split(/\s+/, $rec);
 
 $mac = uc($mac);
 
-open(IN,"/etc/transit-appliance-loader/jsconfig/hwid.js");
+open(IN,"/etc/raspbian-loader/transit-appliance-loader/jsconfig/hwid.js");
 my $current_js = "";
 while (my $line = <IN>) {
 	$current_js .= $line;
@@ -18,7 +18,7 @@ EOD
 ;
 
 if ($current_js ne $proposed_js) {
-	open(OUT,">/etc/transit-appliance-loader/jsconfig/hwid.js");
+	open(OUT,">/etc/raspbian-loader/transit-appliance-loader/jsconfig/hwid.js");
 	print OUT $proposed_js;
 	close(OUT);
 }
